@@ -1,0 +1,60 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: rag-ollama
+    ports:
+      - "11434:11434"
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - rag-network
+    entrypoint: >
+      sh -c "ollama serve & sleep 10 && ollama pull mistral && wait"
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+  rag-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rag-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=dummy_key_ollama
+      - CHROMA_PERSIST_DIR=/app/chroma_db
+      - TOP_K_RETRIEVAL=10
+      - TOP_K_RERANK=3
+      - OLLAMA_BASE_URL=http://rag-ollama:11434
+      - OLLAMA_MODEL=mistral
+      - OLLAMA_NUM_PREDICT=140
+      - OLLAMA_NUM_CTX=1536
+      - OLLAMA_KEEP_ALIVE=20m
+      - RAG_MAX_CHUNK_CHARS=700
+    volumes:
+      - ./data:/app/data
+      - ./chroma_db:/app/chroma_db
+      - ./bm25_index.pkl:/app/bm25_index.pkl
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - rag-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  ollama_data:
+
+networks:
+  rag-network:
+    driver: bridge

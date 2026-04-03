@@ -1,0 +1,12 @@
+[
+  {"question": "What is the refund policy?", "ground_truth": "Customers may return products within 30 days for a full refund. Enterprise customers get 60 days.", "source_document": "refund_policy.txt"},
+  {"question": "How do I initiate a refund?", "ground_truth": "Contact support@company.com with your order number.", "source_document": "refund_policy.txt"},
+  {"question": "How long does a refund take to process?", "ground_truth": "Refunds are processed within 5-7 business days.", "source_document": "refund_policy.txt"},
+  {"question": "What is the onboarding process for new employees?", "ground_truth": "New employees must sign their contract, set up company email, complete security training, and meet their team lead.", "source_document": "onboarding_guide.txt"},
+  {"question": "What is the home office stipend for remote employees?", "ground_truth": "Remote employees receive a $500 home office stipend.", "source_document": "onboarding_guide.txt"},
+  {"question": "How much does the Pro tier cost?", "ground_truth": "The Pro tier costs $29 per month.", "source_document": "product_docs.txt"},
+  {"question": "What storage does the Free tier include?", "ground_truth": "The Free tier includes 1GB of storage.", "source_document": "product_docs.txt"},
+  {"question": "Is there a free trial available?", "ground_truth": "All paid plans include a 14-day free trial.", "source_document": "product_docs.txt"},
+  {"question": "What discount is available for annual billing?", "ground_truth": "Annual billing provides a 20% discount.", "source_document": "product_docs.txt"},
+  {"question": "Are digital products refundable?", "ground_truth": "Digital products are non-refundable after download.", "source_document": "refund_policy.txt"}
+]

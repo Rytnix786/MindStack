@@ -1,0 +1,1 @@
+Product Documentation: Our platform supports three pricing tiers. The Free tier allows up to 3 projects and 1GB storage. The Pro tier at $29/month allows unlimited projects and 50GB storage. The Enterprise tier offers custom pricing, SSO, dedicated support, and unlimited storage. All paid plans include a 14-day free trial. Annual billing provides a 20% discount.

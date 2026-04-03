@@ -1,0 +1,27 @@
+"""Configuration management for the RAG system."""
+
+from pathlib import Path
+
+from dotenv import load_dotenv
+from pydantic import BaseModel, ConfigDict, Field
+from pydantic_settings import BaseSettings
+
+# Load environment variables from the project root .env file when present.
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+load_dotenv(PROJECT_ROOT / ".env")
+
+
+class Settings(BaseSettings):
+    """Application settings loaded from environment variables."""
+    
+    model_config = ConfigDict(env_file=".env", case_sensitive=False)
+
+    openai_api_key: str = Field(default="dummy_key_ollama", alias="OPENAI_API_KEY")
+    chroma_persist_dir: str = Field(default="./chroma_db", alias="CHROMA_PERSIST_DIR")
+    top_k_retrieval: int = Field(default=10, alias="TOP_K_RETRIEVAL")
+    top_k_rerank: int = Field(default=3, alias="TOP_K_RERANK")
+    faithfulness_threshold: float = Field(default=0.75, alias="FAITHFULNESS_THRESHOLD")
+    ollama_host: str = Field(default="http://rag-ollama:11434", alias="OLLAMA_HOST")
+
+
+settings = Settings()
