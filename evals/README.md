@@ -68,6 +68,10 @@ Results are written to:
 
 - `results/latest.json`
 
+When running eval through Docker (`run-eval.ps1`), results are written inside the
+running backend container at `/app/evals/results/latest.json`.
+For a host-local `evals/results/latest.json`, run evaluation directly from host Python.
+
 This file includes a timestamp, overall metrics, per-category metrics, gate status, and per-case outputs.
 
 ## Running Evaluation
@@ -83,6 +87,18 @@ Or directly:
 ```powershell
 python evals/evaluate.py
 ```
+
+## Latest Verified Run
+
+Run timestamp: `2026-04-03T18:55:37.226867Z`
+
+- Total cases: `50`
+- Overall pass rate: `74.00% (37/50)`
+- Grounded: `100.00% (20/20)`
+- Adversarial: `80.00% (8/10)`
+- Edge cases: `100.00% (5/5)`
+- Refusal accuracy: `26.67% (4/15)`
+- Quality gate (`>= 90%` refusal accuracy): `FAILED`
 
 ## Adding New Pairs
 

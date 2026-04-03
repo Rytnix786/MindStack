@@ -24,7 +24,7 @@ except ImportError:  # pragma: no cover
 
 COLLECTION_NAME = "rag_documents"
 MODEL_NAME = "gpt-4o-mini"
-BM25_INDEX_PATH = Path("./bm25_index.pkl")
+BM25_INDEX_PATH = Path(__file__).resolve().parent.parent / "bm25_index.pkl"
 PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "rag_system_prompt.yaml"
 
 _VECTORSTORE: Optional[Any] = None

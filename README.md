@@ -55,7 +55,7 @@ flowchart TD
 | LLM | Ollama + Mistral | Local inference with no external API dependency |
 | Deployment | Docker Compose | Reproducible local environment and easy demo setup |
 | Frontend | React + Vite + Tailwind CSS | Responsive, modern, portfolio-ready UI |
-| Evaluation | RAGAS + quality gate | Measures faithfulness, relevancy, and context precision |
+| Evaluation | Dataset-driven evaluator + quality gate | Enforces per-category pass rates and refusal-accuracy threshold |
 | Observability | JSONL logs + `/metrics` | Query-level tracing and runtime visibility |
 
 ## Core Features
@@ -67,6 +67,32 @@ flowchart TD
 - **Quality gate**: Evaluation results can block promotion when grounding drops below target.
 - **Fast repeat queries**: In-memory caching and query normalization reduce latency.
 - **Better demo UX**: The React frontend shows citations, cache state, metrics, and follow-up prompts clearly.
+
+## Project Structure
+
+```text
+rag-system/
+├─ src/                     # Backend API, retrieval, ingestion, models, DB metrics
+├─ frontend/                # React + Vite UI
+│  ├─ src/                  # App UI and styles
+│  └─ package.json          # Frontend scripts and dependencies
+├─ evals/                   # Evaluation dataset, runner, thresholds, results
+├─ tests/                   # Unit and integration tests
+├─ data/                    # Source documents + metrics DB
+├─ chroma_db/               # Persistent vector store artifacts
+├─ prompts/                 # Prompt configuration (rag_system_prompt.yaml)
+├─ docker-compose.yml       # Ollama + backend services
+└─ run-*.ps1                # Utility scripts (eval, ingestion, health checks)
+```
+
+### Important Root Scripts
+
+| Script | Purpose |
+|---|---|
+| `run-ingestion.ps1` | Rebuilds chunks/embeddings and BM25 index inside backend container |
+| `run-eval.ps1` | Runs eval dataset against current retrieval/generation pipeline |
+| `check-health.ps1` | Checks Docker state + backend health + metrics endpoint |
+| `test_comprehensive.py` | End-to-end backend sanity test run |
 
 ## API Reference
 
@@ -124,6 +150,16 @@ Rebuilds the document index from files in `data/`.
 curl -X POST http://localhost:8000/ingest
 ```
 
+### `POST /upload`
+
+Uploads one or more documents and triggers reindex.
+
+Supported file types: `.pdf`, `.txt`, `.md`, `.doc`, `.docx`
+
+```bash
+curl -X POST http://localhost:8000/upload -F "files=@data/refund_policy.txt"
+```
+
 ### `GET /metrics`
 
 Returns operational metrics derived from query logs.
@@ -133,9 +169,26 @@ Returns operational metrics derived from query logs.
    "total_queries": 148,
    "grounded_rate": 0.96,
    "avg_latency_ms": 612.4,
-   "p95_latency_ms": 1840.7,
-   "cache_hit_rate": 0.41
+    "p95_latency_ms": 1840.7,
+    "p50_latency_ms": 420.2,
+    "queries_last_24h": 148,
+    "grounded_rate_7d": 0.95
 }
+```
+
+### `GET /metrics/trend`
+
+Returns daily trend points (grounded rate and average latency).
+
+```json
+[
+   {
+      "date": "2026-04-03",
+      "total_queries": 74,
+      "grounded_rate": 0.878,
+      "avg_latency_ms": 445.6
+   }
+]
 ```
 
 ### `GET /health`
@@ -150,30 +203,33 @@ Returns service health for orchestration and checks.
 
 ## Performance & Evaluation
 
-Sample numbers from a recent demo run. Replace them with your latest evaluation output when publishing.
+Latest verified run (2026-04-03) after reindex + evaluation rerun.
 
 ### Runtime Metrics
 
 | Metric | Latest | Notes |
 |---|---:|---|
-| Average latency | 612.4 ms | Measured across mixed cached and uncached queries |
-| p95 latency | 1840.7 ms | Tail latency on harder fallback queries |
-| Grounded rate | 96% | Responses supported by retrieved evidence |
-| Cache hit rate | 41% | Normalized query cache on repeat and near-repeat prompts |
+| Average latency | 445.6 ms | From live `/metrics` endpoint |
+| p95 latency | 58.7 ms | Current percentile output from `/metrics` |
+| p50 latency | 12.3 ms | Median query latency |
+| Grounded rate | 87.84% | Responses supported by retrieved evidence |
+| Queries (24h) | 74 | Queries observed over last 24 hours |
 
 ### Evaluation Metrics
 
 | Metric | Latest | Threshold |
 |---|---:|---:|
-| Faithfulness | 0.94 | >= 0.75 |
-| Answer relevancy | 0.91 | project-defined |
-| Context precision | 0.89 | project-defined |
+| Overall pass rate | 74.00% (37/50) | project-defined |
+| Grounded pass rate | 100.00% (20/20) | project-defined |
+| Adversarial pass rate | 80.00% (8/10) | project-defined |
+| Edge cases pass rate | 100.00% (5/5) | project-defined |
+| Refusal accuracy | 26.67% (4/15) | >= 90% |
 
 ### Evaluation Results
 
 | Run Date | Dataset Size | Pass/Fail | Notes |
 |---|---:|---|---|
-| 2026-04-03 | 10 QA pairs | Pass | RAGAS evaluation plus grounding gate |
+| 2026-04-03 18:55:37Z | 50 QA pairs | Fail | Quality gate failed on refusal accuracy threshold |
 
 ## How to Run Locally
 
@@ -187,14 +243,21 @@ docker compose up -d
 Then open:
 
 - API health: http://localhost:8000/health
-- Frontend: http://localhost:3000
+- Frontend: start separately with Vite dev server
 
 ### Option 2: Run frontend separately
 
 ```bash
 cd frontend
 npm install
-npm start
+npm run dev
+```
+
+Default frontend URL is `http://localhost:3000`.
+If port 3000 is occupied, run with an explicit port:
+
+```bash
+npm run dev -- --host 0.0.0.0 --port 5173
 ```
 
 ### Quick checks
@@ -213,9 +276,17 @@ curl -X POST http://localhost:8000/ingest
 ### Run evaluation
 
 ```bash
-cd evals
+cd h:\Projects\RAG_App_01\rag-system
 .\run-eval.ps1
 ```
+
+## Data and Runtime Artifacts
+
+- `data/*.txt`: primary source documents used by ingestion.
+- `data/uploads/`: user-uploaded files accepted by `/upload` endpoint.
+- `data/metrics.db`: SQLite metrics store used by `/metrics` and `/metrics/trend`.
+- `chroma_db/` + `bm25_index.pkl`: retrieval artifacts rebuilt by ingestion.
+- `evals/results/latest.json`: latest evaluation output snapshot.
 
 ## CI/CD and Production Readiness
 

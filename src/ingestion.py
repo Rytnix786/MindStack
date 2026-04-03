@@ -15,7 +15,7 @@ except ImportError:  # pragma: no cover
 
 COLLECTION_NAME = "rag_documents"
 EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
-BM25_INDEX_PATH = Path("./bm25_index.pkl")
+BM25_INDEX_PATH = Path(__file__).resolve().parent.parent / "bm25_index.pkl"
 
 
 def _get_chroma_persist_dir() -> str:
