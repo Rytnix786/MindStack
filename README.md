@@ -40,7 +40,7 @@ flowchart TD
 
 ## Screenshots
 
-https://ibb.co.com/LDKXK1Js
+<a href="https://ibb.co.com/LDKXK1Js"><img src="https://i.ibb.co.com/kVZsZX9P/screencapture-localhost-5173-2026-04-04-00-22-42.png" alt="screencapture localhost 5173 2026 04 04 00 22 42" border="0"></a>
 
 | Frontend Dashboard | Query Result |
 |---|---|
