@@ -6,7 +6,6 @@
    <img src="https://img.shields.io/badge/Backend-FastAPI-009688?logo=fastapi&logoColor=white" alt="FastAPI">
    <img src="https://img.shields.io/badge/Frontend-React%20%2B%20Vite-61DAFB?logo=react&logoColor=000" alt="React Vite">
    <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License MIT">
-   <img src="https://img.shields.io/badge/Status-Portfolio%20Ready-0f766e" alt="Status portfolio ready">
 </p>
 
 Production-grade Retrieval-Augmented Generation for domain-specific document Q&A.
