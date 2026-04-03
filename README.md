@@ -40,7 +40,7 @@ flowchart TD
 
 ## Screenshots
 
-> Replace these placeholders with your real images or GIFs for GitHub and LinkedIn.
+https://ibb.co.com/LDKXK1Js
 
 | Frontend Dashboard | Query Result |
 |---|---|
