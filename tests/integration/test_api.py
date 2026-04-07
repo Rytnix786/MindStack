@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import sqlite3
 from contextlib import closing
-from types import SimpleNamespace
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -85,23 +84,29 @@ def test_metrics_returns_expected_schema(tmp_path, monkeypatch):
 
 
 def test_ingest_triggers_reindex(monkeypatch):
-    called = {"value": False}
+    called = {"ingest": 0, "refresh": 0}
 
-    def fake_run(*args, **kwargs):
-        called["value"] = True
-        assert args[0] == ["python", "-m", "src.ingestion"]
-        return SimpleNamespace(returncode=0, stdout="ok", stderr="")
+    def fake_ingest_documents(_data_dir: str):
+        called["ingest"] += 1
+        return {"chunks_created": 1, "documents_processed": 1, "collection_name": "rag_documents"}
 
-    monkeypatch.setattr("subprocess.run", fake_run)
+    def fake_refresh():
+        called["refresh"] += 1
+
+    # Allow admin endpoints in tests without headers.
+    monkeypatch.setattr(api.settings, "enable_unauth_admin", True)
+    monkeypatch.setattr(api, "ingest_documents", fake_ingest_documents)
+    monkeypatch.setattr(api, "refresh_retrieval_resources", fake_refresh)
     client = TestClient(api.app)
 
     response = client.post("/ingest")
 
-    assert called["value"] is True
+    assert called["ingest"] == 1
+    assert called["refresh"] == 1
     assert response.status_code == 200
     payload = response.json()
     assert payload["status"] == "success"
-    assert payload["stdout"] == "ok"
+    assert "summary" in payload
 
 
 @pytest.mark.asyncio

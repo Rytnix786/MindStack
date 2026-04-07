@@ -6,6 +6,8 @@
    <img src="https://img.shields.io/badge/Backend-FastAPI-009688?logo=fastapi&logoColor=white" alt="FastAPI">
    <img src="https://img.shields.io/badge/Frontend-React%20%2B%20Vite-61DAFB?logo=react&logoColor=000" alt="React Vite">
    <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License MIT">
+   <a href="https://github.com/Rytnix786/MindStack/actions/workflows/ci.yml"><img src="https://github.com/Rytnix786/MindStack/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
+   <a href="https://github.com/Rytnix786/MindStack/actions/workflows/rag_quality_gate.yml"><img src="https://github.com/Rytnix786/MindStack/actions/workflows/rag_quality_gate.yml/badge.svg" alt="RAG quality gate status"></a>
 </p>
 
 Production-grade Retrieval-Augmented Generation for domain-specific document Q&A.
@@ -286,7 +288,8 @@ cd h:\Projects\RAG_App_01\rag-system
 - `data/uploads/`: user-uploaded files accepted by `/upload` endpoint.
 - `data/metrics.db`: SQLite metrics store used by `/metrics` and `/metrics/trend`.
 - `chroma_db/` + `bm25_index.pkl`: retrieval artifacts rebuilt by ingestion.
-- `evals/results/latest.json`: latest evaluation output snapshot.
+- `evals/eval_results.json`: canonical evaluation output (CI + artifacts).
+- `evals/results/latest.json`: rolling evaluation snapshot.
 
 ## CI/CD and Production Readiness
 

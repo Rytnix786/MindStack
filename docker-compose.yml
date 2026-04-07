@@ -28,6 +28,7 @@ services:
       - "8000:8000"
     environment:
       - OPENAI_API_KEY=dummy_key_ollama
+      - ADMIN_API_KEY=local-dev-admin-key
       - CHROMA_PERSIST_DIR=/app/chroma_db
       - TOP_K_RETRIEVAL=10
       - TOP_K_RERANK=3

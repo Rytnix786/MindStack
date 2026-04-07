@@ -8,6 +8,7 @@ import pickle
 import re
 import sys
 import time
+import threading
 from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Dict, List, Optional, cast
@@ -35,6 +36,7 @@ _PROMPT_CONFIG: Optional[Dict[str, Any]] = None
 # In-memory query cache with FIFO eviction
 _QUERY_CACHE_MAX_SIZE = 100
 _QUERY_CACHE: OrderedDict[str, RAGResponse] = OrderedDict()
+_QUERY_CACHE_LOCK = threading.Lock()
 
 # Generation tuning knobs (override via env when needed).
 _MAX_CHUNK_CHARS = int(os.getenv("RAG_MAX_CHUNK_CHARS", "900"))
@@ -249,25 +251,34 @@ def _extractive_fast_answer(query: str, chunks: List[Dict[str, Any]]) -> Optiona
     return " ".join(selected).strip()
 
 
-def _get_cached_response(query: str) -> Optional[RAGResponse]:
-    """Retrieve cached response if it exists."""
-    cache_key = _normalize_query(query)
-    if cache_key in _QUERY_CACHE:
-        # Move to end to track freshness in FIFO eviction
+def _build_cache_key(request: QueryRequest) -> str:
+    """Build a stable cache key including parameters that affect output."""
+    normalized_query = _normalize_query(request.query)
+    return f"q={normalized_query}|tkR={int(request.top_k_retrieval)}|tkX={int(request.top_k_rerank)}"
+
+
+def _get_cached_response(cache_key: str) -> Optional[RAGResponse]:
+    """Retrieve a cached response by key, returning a copy safe to mutate."""
+    with _QUERY_CACHE_LOCK:
+        if cache_key not in _QUERY_CACHE:
+            return None
         _QUERY_CACHE.move_to_end(cache_key)
-        return _QUERY_CACHE[cache_key]
-    return None
+        cached = _QUERY_CACHE[cache_key]
+
+    # Never return the shared instance: callers may tweak latency/timestamp flags.
+    return cached.model_copy(deep=True)
 
 
-def _cache_response(query: str, response: RAGResponse) -> None:
-    """Store response in cache with FIFO eviction if cache is full."""
-    cache_key = _normalize_query(query)
-    
-    # If cache is full, remove oldest entry (first item in OrderedDict)
-    if len(_QUERY_CACHE) >= _QUERY_CACHE_MAX_SIZE and cache_key not in _QUERY_CACHE:
-        _QUERY_CACHE.popitem(last=False)
-    
-    _QUERY_CACHE[cache_key] = response
+def _cache_response(cache_key: str, response: RAGResponse) -> None:
+    """Store response in cache with LRU eviction when capacity exceeded."""
+    with _QUERY_CACHE_LOCK:
+        if cache_key in _QUERY_CACHE:
+            _QUERY_CACHE.move_to_end(cache_key)
+
+        if len(_QUERY_CACHE) >= _QUERY_CACHE_MAX_SIZE and cache_key not in _QUERY_CACHE:
+            _QUERY_CACHE.popitem(last=False)
+
+        _QUERY_CACHE[cache_key] = response
 
 
 def load_prompt_config() -> Dict[str, Any]:
@@ -533,11 +544,10 @@ def run_rag_query(request: QueryRequest) -> RAGResponse:
     start = time.perf_counter()
 
     query = request.query
+    cache_key = _build_cache_key(request)
 
-    # Check cache first
-    cached_response = _get_cached_response(query)
+    cached_response = _get_cached_response(cache_key)
     if cached_response is not None:
-        # Return cached response with updated timestamp and latency
         cache_latency_ms = (time.perf_counter() - start) * 1000
         cached_response.latency_ms = cache_latency_ms
         cached_response.cached = True
@@ -569,7 +579,7 @@ def run_rag_query(request: QueryRequest) -> RAGResponse:
             llm_called=False,
             cached=False,
         )
-        _cache_response(query, response)
+        _cache_response(cache_key, response)
         return response
 
     result_dict = generate_answer(query=query, chunks=reranked_chunks)
@@ -604,7 +614,7 @@ def run_rag_query(request: QueryRequest) -> RAGResponse:
     )
     
     # Store in cache for future identical queries
-    _cache_response(query, response)
+    _cache_response(cache_key, response)
     return response
 
 

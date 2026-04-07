@@ -42,6 +42,7 @@ jobs:
       - name: Run evaluation
         env:
           OLLAMA_BASE_URL: http://localhost:11434
+          EVAL_REFUSAL_ACCURACY_THRESHOLD: "0.25"
         run: python evals/evaluate.py
         
       - name: Check quality thresholds

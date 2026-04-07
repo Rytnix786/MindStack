@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     top_k_rerank: int = Field(default=3, alias="TOP_K_RERANK")
     faithfulness_threshold: float = Field(default=0.75, alias="FAITHFULNESS_THRESHOLD")
     ollama_host: str = Field(default="http://rag-ollama:11434", alias="OLLAMA_HOST")
+    admin_api_key: str = Field(default="", alias="ADMIN_API_KEY")
+    enable_unauth_admin: bool = Field(default=False, alias="RAG_ENABLE_UNAUTHED_ADMIN")
 
 
 settings = Settings()

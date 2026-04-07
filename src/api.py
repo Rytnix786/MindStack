@@ -5,10 +5,11 @@ import os
 from pathlib import Path
 from typing import Any, List
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 try:
+    from .config import settings
     from .db import get_metrics_summary, get_metrics_trend, init_db, insert_query_result
     from .ingestion import ingest_documents, load_and_chunk_documents
     from .models import QueryRequest, RAGResponse
@@ -16,6 +17,7 @@ try:
     from .reranker import Reranker
     from .retrieval import Retriever, run_rag_query
 except ImportError:  # pragma: no cover
+    from config import settings
     from db import get_metrics_summary, get_metrics_trend, init_db, insert_query_result
     from ingestion import ingest_documents, load_and_chunk_documents
     from models import QueryRequest, RAGResponse
@@ -25,6 +27,32 @@ except ImportError:  # pragma: no cover
 
 
 app = FastAPI(title="RAG System API", version="1.0.0")
+
+
+def _require_admin(
+    x_admin_api_key: str | None = Header(default=None, alias="X-Admin-Api-Key"),
+    authorization: str | None = Header(default=None, alias="Authorization"),
+) -> None:
+    """Protect mutating admin endpoints (/upload, /ingest) for public deployments."""
+    if bool(getattr(settings, "enable_unauth_admin", False)):
+        return
+
+    expected = str(getattr(settings, "admin_api_key", "")).strip()
+    if not expected:
+        raise HTTPException(
+            status_code=503,
+            detail="Admin endpoints are disabled. Set ADMIN_API_KEY to enable /upload and /ingest.",
+        )
+
+    token = (x_admin_api_key or "").strip()
+    if not token and authorization:
+        lower = authorization.lower()
+        if lower.startswith("bearer "):
+            token = authorization[7:].strip()
+
+    if token != expected:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
 
 def _get_allowed_origins() -> list[str]:
     """Load allowed CORS origins from ALLOWED_ORIGINS or use safe defaults."""
@@ -89,7 +117,7 @@ def health() -> dict:
 
 
 @app.post("/ingest")
-async def trigger_ingestion():
+async def trigger_ingestion(_auth: None = Depends(_require_admin)):
     try:
         summary = ingest_documents(str(DATA_DIR))
         refresh_retrieval_resources()
@@ -99,7 +127,10 @@ async def trigger_ingestion():
 
 
 @app.post("/upload")
-async def upload_documents(files: list[UploadFile] = File(...)) -> dict[str, Any]:
+async def upload_documents(
+    files: list[UploadFile] = File(...),
+    _auth: None = Depends(_require_admin),
+) -> dict[str, Any]:
     """Upload source files, ingest them, and refresh retrieval resources."""
     if not files:
         raise HTTPException(status_code=400, detail="No files uploaded.")

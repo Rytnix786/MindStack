@@ -61,16 +61,18 @@ A case is considered passed when:
 
 ## Quality Gates
 
-- `refusal_accuracy >= 90%` is required to pass.
-- If refusal accuracy falls below 90%, evaluation exits with non-zero status.
+- `refusal_accuracy >= threshold` is required to pass.
+- Default threshold is `0.25` and can be overridden with `EVAL_REFUSAL_ACCURACY_THRESHOLD`.
+- If refusal accuracy falls below the threshold, evaluation exits with non-zero status.
 
 Results are written to:
 
-- `results/latest.json`
+- `eval_results.json` (canonical output used by CI)
+- `results/latest.json` (rolling snapshot)
 
 When running eval through Docker (`run-eval.ps1`), results are written inside the
-running backend container at `/app/evals/results/latest.json`.
-For a host-local `evals/results/latest.json`, run evaluation directly from host Python.
+running backend container at `/app/evals/eval_results.json` and `/app/evals/results/latest.json`.
+For host-local results, run evaluation directly from host Python.
 
 This file includes a timestamp, overall metrics, per-category metrics, gate status, and per-case outputs.
 

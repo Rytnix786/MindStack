@@ -21,6 +21,12 @@ env/
 logs/
 *.jsonl
 
+# Data / indexes (generated)
+data/uploads/
+data/metrics.db
+chroma_db/
+bm25_index.pkl
+
 # Frontend artifacts
 frontend/node_modules/
 frontend/dist/
@@ -28,6 +34,9 @@ frontend/dist/
 # IDE/editor
 .vscode/
 .idea/
+
+# TestSprite (local config + reports)
+.testsprite/
 
 # OS files
 .DS_Store
