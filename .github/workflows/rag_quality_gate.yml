@@ -9,6 +9,8 @@ on:
 jobs:
   quality-gate:
     runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v4
       
@@ -58,6 +60,8 @@ jobs:
   test-api:
     runs-on: ubuntu-latest
     needs: quality-gate
+    env:
+      PYTHONPATH: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v4
       
@@ -82,10 +86,21 @@ jobs:
           python -m src.ingestion
           
       - name: Start API server
-        run: python -m src.api &
+        run: |
+          python -m uvicorn src.api:app --host 0.0.0.0 --port 8000 > api-server.log 2>&1 &
         
       - name: Wait for server
-        run: sleep 5
+        run: |
+          for i in {1..30}; do
+            if curl -fsS http://localhost:8000/health >/dev/null; then
+              echo "API is healthy"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "API failed to become healthy in time"
+          cat api-server.log || true
+          exit 1
         
       - name: Health check
         run: curl -f http://localhost:8000/health
@@ -107,3 +122,10 @@ jobs:
           
       - name: Test metrics endpoint
         run: curl -f http://localhost:8000/metrics
+
+      - name: Upload API server logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-server-log
+          path: api-server.log

@@ -9,6 +9,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ${{ github.workspace }}
 
     steps:
       - name: Checkout
@@ -26,4 +28,4 @@ jobs:
           pip install pytest pytest-asyncio pytest-cov
 
       - name: Run tests
-        run: pytest
+        run: python -m pytest -ra

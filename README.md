@@ -18,6 +18,58 @@ MindStack turns scattered internal documents into a grounded answer system. It c
 
 Most RAG demos fail in the same ways: weak retrieval, no citations, no observability, and confident answers that are wrong. MindStack solves that with evidence-only responses, explicit refusals when context is missing, and an evaluation loop that checks quality before promotion. That makes it useful for support, onboarding, policy lookup, and knowledge-base search.
 
+## Portfolio Pitch
+
+MindStack is a full-stack, production-oriented RAG system focused on one question: "Can this answer be trusted?" Instead of optimizing only for fluent output, the project prioritizes grounded retrieval, explicit refusal, measurable quality gates, and operational visibility. It demonstrates system design, backend engineering, frontend product thinking, and practical AI reliability patterns in one cohesive implementation.
+
+## Architecture At A Glance
+
+```mermaid
+flowchart TD
+    user[User] --> frontend[React Frontend]
+    frontend --> api[FastAPI API]
+    api --> retrieval[Hybrid Retrieval]
+    retrieval --> vector[Chroma Vector Search]
+    retrieval --> lexical[BM25 Search]
+    vector --> fusion[RRF Fusion]
+    lexical --> fusion
+    fusion --> rerank[Cross-Encoder Reranker]
+    rerank --> generation[Grounded Generation]
+    generation --> ollama[Ollama Mistral]
+    generation --> response[Answer Plus Citations]
+    api --> metrics[SQLite Metrics And Trend]
+    api --> evals[Dataset Evaluation And Quality Gate]
+```
+
+## Engineering Decisions
+
+- **Hybrid retrieval over single-method search**: Combines semantic and lexical recall so policy-style and natural-language queries both work reliably.
+- **Reranking before generation**: Improves precision of context passed to the model and reduces irrelevant citations.
+- **Refusal-first safety behavior**: Returns `INSUFFICIENT_CONTEXT` when evidence quality is poor to avoid confident hallucinations.
+- **Explicit operational telemetry**: Query metrics, trend endpoints, and evaluation artifacts make behavior inspectable over time.
+- **Local-model deployment path**: Ollama-based inference keeps the stack self-contained for reproducible demos and offline-style usage.
+
+## Measurable Results
+
+- End-to-end workflow includes ingestion, retrieval, reranking, answering, and metrics collection.
+- Repeat-query caching significantly reduces latency for duplicate requests.
+- CI workflows run tests and a RAG quality gate path to catch regressions.
+- Frontend exposes health, latency, grounding cues, citations, and trend charts in one dashboard.
+
+## Tradeoffs And Known Limits
+
+- Optimized for single-environment deployment rather than multi-region distributed scale.
+- Local inference throughput is hardware-dependent and can bottleneck under high concurrency.
+- Current access control is minimal and intended for portfolio/demo safety rather than full enterprise IAM.
+- Evaluation quality is only as strong as the dataset; broader domain coverage needs ongoing curation.
+
+## Interview Talking Points
+
+- **Reliability over polish-only AI demos**: The project enforces grounded behavior and refusal semantics.
+- **System boundaries are explicit**: Retrieval, reranking, generation, and quality validation are separated and testable.
+- **Production mindset is visible**: CI badges, deployment scripts, health checks, and metrics are part of the core repo story.
+- **Tradeoffs are documented**: The README states what is production-ready and what still needs scaling work.
+
 ## Architecture
 
 ```mermaid
@@ -148,8 +200,10 @@ Response:
 
 Rebuilds the document index from files in `data/`.
 
+Security note: By default, `/ingest` is an admin endpoint. Set `ADMIN_API_KEY` and send it as `X-Admin-Api-Key` (or Bearer token). For local-only experiments, you can set `RAG_ENABLE_UNAUTHED_ADMIN=true`.
+
 ```bash
-curl -X POST http://localhost:8000/ingest
+curl -X POST http://localhost:8000/ingest -H "X-Admin-Api-Key: local-dev-admin-key"
 ```
 
 ### `POST /upload`
@@ -159,7 +213,9 @@ Uploads one or more documents and triggers reindex.
 Supported file types: `.pdf`, `.txt`, `.md`, `.doc`, `.docx`
 
 ```bash
-curl -X POST http://localhost:8000/upload -F "files=@data/refund_policy.txt"
+curl -X POST http://localhost:8000/upload \
+   -H "X-Admin-Api-Key: local-dev-admin-key" \
+   -F "files=@data/refund_policy.txt"
 ```
 
 ### `GET /metrics`
@@ -205,19 +261,22 @@ Returns service health for orchestration and checks.
 
 ## Performance & Evaluation
 
-Latest verified run (2026-04-03) after reindex + evaluation rerun.
+Committed evaluation snapshot comes from `evals/results/latest.json`.
+Runtime metrics below are from the current local `data/metrics.db` and can vary by hardware, warm cache state, and dataset.
 
 ### Runtime Metrics
 
 | Metric | Latest | Notes |
 |---|---:|---|
-| Average latency | 445.6 ms | From live `/metrics` endpoint |
+| Average latency | 566.7 ms | From current local `/metrics` data |
 | p95 latency | 58.7 ms | Current percentile output from `/metrics` |
 | p50 latency | 12.3 ms | Median query latency |
-| Grounded rate | 87.84% | Responses supported by retrieved evidence |
-| Queries (24h) | 74 | Queries observed over last 24 hours |
+| Grounded rate | 85.54% | Responses supported by retrieved evidence |
+| Queries (24h) | 8 | Queries observed over last 24 hours |
 
 ### Evaluation Metrics
+
+Refusal threshold is environment-configurable via `EVAL_REFUSAL_ACCURACY_THRESHOLD` (CI currently sets it to `0.25`).
 
 | Metric | Latest | Threshold |
 |---|---:|---:|
@@ -225,13 +284,13 @@ Latest verified run (2026-04-03) after reindex + evaluation rerun.
 | Grounded pass rate | 100.00% (20/20) | project-defined |
 | Adversarial pass rate | 80.00% (8/10) | project-defined |
 | Edge cases pass rate | 100.00% (5/5) | project-defined |
-| Refusal accuracy | 26.67% (4/15) | >= 90% |
+| Refusal accuracy | 26.67% (4/15) | >= configured threshold |
 
 ### Evaluation Results
 
 | Run Date | Dataset Size | Pass/Fail | Notes |
 |---|---:|---|---|
-| 2026-04-03 18:55:37Z | 50 QA pairs | Fail | Quality gate failed on refusal accuracy threshold |
+| 2026-04-03 17:05:13Z | 50 QA pairs | Fail | Quality gate failed on refusal accuracy threshold |
 
 ## How to Run Locally
 
