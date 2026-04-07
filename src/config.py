@@ -24,6 +24,13 @@ class Settings(BaseSettings):
     ollama_host: str = Field(default="http://rag-ollama:11434", alias="OLLAMA_HOST")
     admin_api_key: str = Field(default="", alias="ADMIN_API_KEY")
     enable_unauth_admin: bool = Field(default=False, alias="RAG_ENABLE_UNAUTHED_ADMIN")
+    refusal_confidence_enabled: bool = Field(default=True, alias="RAG_REFUSAL_CONFIDENCE_ENABLED")
+    refusal_confidence_threshold: float = Field(default=0.18, alias="RAG_REFUSAL_CONFIDENCE_THRESHOLD")
+    force_fallback_on_model_refusal: bool = Field(default=False, alias="RAG_FORCE_FALLBACK_ON_MODEL_REFUSAL")
+    force_fallback_confidence_threshold: float = Field(
+        default=0.55,
+        alias="RAG_FORCE_FALLBACK_CONFIDENCE_THRESHOLD",
+    )
 
 
 settings = Settings()

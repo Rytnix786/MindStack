@@ -135,12 +135,26 @@ class TestAuthorizationErrors:
             "Bearer ",  # Empty bearer
             "Bearer",  # Missing space
             "Bearer  ",  # Extra spaces
-            "bearer correct-key",  # Wrong case
         ]
         
         for bearer in invalid_bearer:
             response = client.post("/ingest", headers={"Authorization": bearer})
             assert response.status_code == 403
+
+    def test_bearer_token_is_case_insensitive(self, monkeypatch):
+        """Behavior: authorization scheme matching is case-insensitive per HTTP conventions."""
+
+        def fake_ingest(_):
+            return {"chunks_created": 0, "documents_processed": 0, "collection_name": "test"}
+
+        monkeypatch.setattr(api.settings, "enable_unauth_admin", False)
+        monkeypatch.setattr(api.settings, "admin_api_key", "correct-key")
+        monkeypatch.setattr(api, "ingest_documents", fake_ingest)
+        monkeypatch.setattr(api, "refresh_retrieval_resources", lambda: None)
+
+        client = TestClient(api.app)
+        response = client.post("/ingest", headers={"Authorization": "bearer correct-key"})
+        assert response.status_code == 200
 
 
 class TestErrorResponseFormats:

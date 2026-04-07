@@ -46,6 +46,12 @@ _OLLAMA_NUM_CTX = int(os.getenv("OLLAMA_NUM_CTX", "2048"))
 _OLLAMA_KEEP_ALIVE = os.getenv("OLLAMA_KEEP_ALIVE", "15m")
 _ENABLE_EXTRACTIVE_FAST_PATH = os.getenv("RAG_EXTRACTIVE_FAST_PATH", "true").lower() == "true"
 _EXTRACTIVE_OVERLAP_THRESHOLD = float(os.getenv("RAG_EXTRACTIVE_OVERLAP_THRESHOLD", "0.18"))
+_REFUSAL_CONFIDENCE_ENABLED = bool(getattr(settings, "refusal_confidence_enabled", True))
+_REFUSAL_CONFIDENCE_THRESHOLD = float(getattr(settings, "refusal_confidence_threshold", 0.18))
+_FORCE_FALLBACK_ON_MODEL_REFUSAL = bool(getattr(settings, "force_fallback_on_model_refusal", False))
+_FORCE_FALLBACK_CONFIDENCE_THRESHOLD = float(
+    getattr(settings, "force_fallback_confidence_threshold", 0.55)
+)
 
 _STOP_WORDS = {
     "a",
@@ -206,6 +212,36 @@ def _has_relevant_support(query: str, chunks: List[Dict[str, Any]]) -> bool:
             return True
 
     return False
+
+
+def _evidence_confidence(query: str, chunks: List[Dict[str, Any]]) -> float:
+    """Estimate evidence quality for answer-vs-refusal decisions.
+
+    Returns a normalized score in [0, 1]. Higher is stronger evidence.
+    """
+    if not chunks:
+        return 0.0
+
+    query_terms = set(_tokenize_meaningful_terms(query))
+    if not query_terms:
+        return 0.0
+
+    best_overlap = 0.0
+    best_reranker = -20.0
+
+    for chunk in chunks:
+        chunk_terms = set(_tokenize_meaningful_terms(str(chunk.get("text", ""))))
+        if chunk_terms:
+            overlap = len(query_terms.intersection(chunk_terms)) / max(len(query_terms), 1)
+            if overlap > best_overlap:
+                best_overlap = overlap
+
+        best_reranker = max(best_reranker, float(chunk.get("reranker_score", chunk.get("score", -20.0))))
+
+    # Cross-encoder scores are unbounded and model-dependent. Normalize conservatively.
+    reranker_component = max(0.0, min((best_reranker + 2.0) / 8.0, 1.0))
+    overlap_component = max(0.0, min(best_overlap, 1.0))
+    return (0.65 * overlap_component) + (0.35 * reranker_component)
 
 
 def _extractive_fast_answer(query: str, chunks: List[Dict[str, Any]]) -> Optional[str]:
@@ -452,6 +488,18 @@ def generate_answer(query: str, chunks: List[Dict[str, Any]]) -> Dict[str, Any]:
             "llm_called": False,
         }
 
+    evidence_confidence = _evidence_confidence(query, chunks)
+    if _REFUSAL_CONFIDENCE_ENABLED and evidence_confidence < _REFUSAL_CONFIDENCE_THRESHOLD:
+        return {
+            "answer": refusal_token,
+            "citations": [],
+            "chunks_retrieved": 0,
+            "model_used": "confidence-gate",
+            "answer_grounded": False,
+            "prompt_version": prompt_version,
+            "llm_called": False,
+        }
+
     context_sections: List[str] = []
     for i, chunk in enumerate(chunks, start=1):
         context_sections.append(
@@ -463,7 +511,7 @@ def generate_answer(query: str, chunks: List[Dict[str, Any]]) -> Dict[str, Any]:
     user_message = (
         f"Question:\n{query}\n\n"
         f"Context Chunks:\n{context_text}\n\n"
-        "Use only these chunks. If chunks are provided, answer directly from them and do not refuse."
+        "Use only these chunks. Refuse only if evidence is clearly insufficient or unrelated."
     )
 
     answer_text = ""
@@ -506,8 +554,10 @@ def generate_answer(query: str, chunks: List[Dict[str, Any]]) -> Dict[str, Any]:
             answer_text = refusal_token
 
     model_refused = RefusalChecker.model_refused(answer_text, refusal_token)
-    if model_refused and chunks:
-        # If the model still refuses while chunks exist, force grounded fallback.
+    if model_refused and chunks and _FORCE_FALLBACK_ON_MODEL_REFUSAL and (
+        evidence_confidence >= _FORCE_FALLBACK_CONFIDENCE_THRESHOLD
+    ):
+        # Force fallback only when confidence is high enough.
         best_chunk = max(chunks, key=RefusalChecker.chunk_score)
         answer_text = str(best_chunk.get("text", "")).strip() or refusal_token
         answer_grounded = answer_text != refusal_token

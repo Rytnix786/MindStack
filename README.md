@@ -261,7 +261,7 @@ Returns service health for orchestration and checks.
 
 ## Sample Query Results
 
-Here are real examples of what MindStack produces—grounded answers with citations, refusals when context is missing, and caching benefits.
+Here are representative examples from local runs—grounded answers with citations, refusals when context is missing, and caching benefits.
 
 ### Example 1: Grounded Answer (Full Generation)
 
@@ -394,17 +394,17 @@ Here are real examples of what MindStack produces—grounded answers with citati
 ## Performance & Evaluation
 
 Committed evaluation snapshot comes from `evals/results/latest.json`.
-Runtime metrics below are from the current local `data/metrics.db` and can vary by hardware, warm cache state, and dataset.
+Runtime metrics vary by hardware, warm cache state, and dataset composition. Use `/metrics` and `/metrics/trend` for your live environment.
 
 ### Runtime Metrics
 
 | Metric | Latest | Notes |
 |---|---:|---|
-| Average latency | 566.7 ms | From current local `/metrics` data |
-| p95 latency | 58.7 ms | Current percentile output from `/metrics` |
-| p50 latency | 12.3 ms | Median query latency |
-| Grounded rate | 85.54% | Responses supported by retrieved evidence |
-| Queries (24h) | 8 | Queries observed over last 24 hours |
+| Average latency | 709.3 ms | Live `/metrics` snapshot (2026-04-07) |
+| p95 latency | 3014.7 ms | Long-tail latency under mixed workloads |
+| p50 latency | 12.3 ms | Median request latency (cache + fast-path heavy) |
+| Grounded rate | 85.06% | Responses supported by retrieved evidence |
+| Queries (24h) | 12 | Queries observed over last 24 hours |
 
 ### Evaluation Metrics
 
@@ -412,17 +412,27 @@ Refusal threshold is environment-configurable via `EVAL_REFUSAL_ACCURACY_THRESHO
 
 | Metric | Latest | Threshold |
 |---|---:|---:|
-| Overall pass rate | 74.00% (37/50) | project-defined |
-| Grounded pass rate | 100.00% (20/20) | project-defined |
+| Overall pass rate | 84.00% (42/50) | project-defined |
+| Grounded pass rate | 95.00% (19/20) | project-defined |
 | Adversarial pass rate | 80.00% (8/10) | project-defined |
 | Edge cases pass rate | 100.00% (5/5) | project-defined |
-| Refusal accuracy | 26.67% (4/15) | >= configured threshold |
+| Refusal accuracy | 66.67% (10/15) | >= configured threshold |
 
 ### Evaluation Results
 
 | Run Date | Dataset Size | Pass/Fail | Notes |
 |---|---:|---|---|
-| 2026-04-03 17:05:13Z | 50 QA pairs | Fail | Quality gate failed on refusal accuracy threshold |
+| 2026-04-07 09:33:35Z | 50 QA pairs | Pass | Conservative refusal-gate tuning; quality gate passed |
+
+### Reliability Improvement Snapshot
+
+| Metric | Before | After |
+|---|---:|---:|
+| Overall pass rate | 74.00% | 84.00% |
+| Refusal accuracy | 26.67% | 66.67% |
+| Grounded pass rate | 100.00% | 95.00% |
+
+This tradeoff is intentional: refusal behavior was improved significantly without aggressive tuning, while grounded quality remains high.
 
 ## How to Run Locally
 
@@ -516,7 +526,6 @@ Share the ngrok URLs with portfolio reviewers. Dead simple for quick demos.
 - `data/uploads/`: user-uploaded files accepted by `/upload` endpoint.
 - `data/metrics.db`: SQLite metrics store used by `/metrics` and `/metrics/trend`.
 - `chroma_db/` + `bm25_index.pkl`: retrieval artifacts rebuilt by ingestion.
-- `evals/eval_results.json`: canonical evaluation output (CI + artifacts).
 - `evals/results/latest.json`: rolling evaluation snapshot.
 
 ## CI/CD and Production Readiness

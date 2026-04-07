@@ -115,11 +115,9 @@ def test_query_endpoint_empty_retrieval_results(monkeypatch):
 
 
 def test_query_response_latency_tracking(monkeypatch):
-    """Validation: Latency should be accurately tracked and reasonable."""
-    import time
+    """Validation: API should preserve latency reported by the pipeline response."""
 
     def fake_run_rag_query(payload: QueryRequest) -> RAGResponse:
-        time.sleep(0.05)  # Simulate 50ms latency
         return _make_response(
             payload,
             grounded=True,
@@ -133,10 +131,10 @@ def test_query_response_latency_tracking(monkeypatch):
     response = client.post("/query", json={"query": "test"})
     assert response.status_code == 200
     data = response.json()
-    
-    # Latency should be positive and reasonable
+
+    # Latency should be present and match mocked pipeline output.
     assert data["latency_ms"] > 0
-    assert data["latency_ms"] > 50  # Should be at least 50ms from our sleep
+    assert data["latency_ms"] == 12.3
 
 
 def test_query_with_extreme_top_k_values(monkeypatch):

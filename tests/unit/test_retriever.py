@@ -71,3 +71,111 @@ def test_bm25_search_handles_empty_index_gracefully(monkeypatch):
     chunks = retrieval.bm25_search("query", top_k=3)
 
     assert chunks == []
+
+
+def test_generate_answer_refuses_on_low_evidence_confidence(monkeypatch):
+    monkeypatch.setattr(
+        retrieval,
+        "load_prompt_config",
+        lambda: {"system_prompt": "test", "refusal_token": "INSUFFICIENT_CONTEXT", "version": "test"},
+    )
+    monkeypatch.setattr(retrieval, "_REFUSAL_CONFIDENCE_ENABLED", True)
+    monkeypatch.setattr(retrieval, "_REFUSAL_CONFIDENCE_THRESHOLD", 0.22)
+
+    # Tiny overlap + weak score passes relevance gate but remains low confidence.
+    chunks = [
+        {
+            "text": "refund generic info",
+            "source": "refund_policy.txt",
+            "chunk_index": 1,
+            "reranker_score": 0.1,
+            "retrieval_method": "hybrid",
+        }
+    ]
+
+    result = retrieval.generate_answer(
+        "refund policy cancellation enterprise annual discount invoice support login",
+        chunks,
+    )
+
+    assert result["answer"] == "INSUFFICIENT_CONTEXT"
+    assert result["answer_grounded"] is False
+    assert result["model_used"] == "confidence-gate"
+    assert result["llm_called"] is False
+
+
+def test_generate_answer_does_not_force_fallback_when_disabled(monkeypatch):
+    class _FakeOllamaClient:
+        def __init__(self, host=None):
+            self.host = host
+
+        def chat(self, **_kwargs):
+            return {"message": {"content": "INSUFFICIENT_CONTEXT"}}
+
+    class _FakeOllamaModule:
+        Client = _FakeOllamaClient
+
+    monkeypatch.setattr(
+        retrieval,
+        "load_prompt_config",
+        lambda: {"system_prompt": "test", "refusal_token": "INSUFFICIENT_CONTEXT", "version": "test"},
+    )
+    monkeypatch.setattr(retrieval, "_ENABLE_EXTRACTIVE_FAST_PATH", False)
+    monkeypatch.setattr(retrieval, "_REFUSAL_CONFIDENCE_ENABLED", True)
+    monkeypatch.setattr(retrieval, "_REFUSAL_CONFIDENCE_THRESHOLD", 0.1)
+    monkeypatch.setattr(retrieval, "_FORCE_FALLBACK_ON_MODEL_REFUSAL", False)
+    monkeypatch.setattr(retrieval.importlib, "import_module", lambda _name: _FakeOllamaModule)
+
+    chunks = [
+        {
+            "text": "Customers may return products within 30 days of purchase.",
+            "source": "refund_policy.txt",
+            "chunk_index": 1,
+            "reranker_score": 4.2,
+            "retrieval_method": "hybrid",
+        }
+    ]
+
+    result = retrieval.generate_answer("What is the refund policy?", chunks)
+
+    assert result["answer"] == "INSUFFICIENT_CONTEXT"
+    assert result["answer_grounded"] is False
+
+
+def test_generate_answer_forces_fallback_only_when_enabled(monkeypatch):
+    class _FakeOllamaClient:
+        def __init__(self, host=None):
+            self.host = host
+
+        def chat(self, **_kwargs):
+            return {"message": {"content": "INSUFFICIENT_CONTEXT"}}
+
+    class _FakeOllamaModule:
+        Client = _FakeOllamaClient
+
+    monkeypatch.setattr(
+        retrieval,
+        "load_prompt_config",
+        lambda: {"system_prompt": "test", "refusal_token": "INSUFFICIENT_CONTEXT", "version": "test"},
+    )
+    monkeypatch.setattr(retrieval, "_ENABLE_EXTRACTIVE_FAST_PATH", False)
+    monkeypatch.setattr(retrieval, "_REFUSAL_CONFIDENCE_ENABLED", True)
+    monkeypatch.setattr(retrieval, "_REFUSAL_CONFIDENCE_THRESHOLD", 0.1)
+    monkeypatch.setattr(retrieval, "_FORCE_FALLBACK_ON_MODEL_REFUSAL", True)
+    monkeypatch.setattr(retrieval, "_FORCE_FALLBACK_CONFIDENCE_THRESHOLD", 0.5)
+    monkeypatch.setattr(retrieval.importlib, "import_module", lambda _name: _FakeOllamaModule)
+
+    chunks = [
+        {
+            "text": "Company Refund Policy: Customers may return products within 30 days.",
+            "source": "refund_policy.txt",
+            "chunk_index": 1,
+            "reranker_score": 4.6,
+            "retrieval_method": "hybrid",
+        }
+    ]
+
+    result = retrieval.generate_answer("What is the refund policy?", chunks)
+
+    assert result["answer_grounded"] is True
+    assert "30 days" in result["answer"]
