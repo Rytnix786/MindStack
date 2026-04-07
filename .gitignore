@@ -13,7 +13,6 @@ venv/
 env/
 
 # Environment and secrets
-.env
 !.env.example
 
 # Logs and runtime artifacts
@@ -41,3 +40,5 @@ frontend/dist/
 # OS files
 .DS_Store
 Thumbs.db
+config.bat
+node_modules
